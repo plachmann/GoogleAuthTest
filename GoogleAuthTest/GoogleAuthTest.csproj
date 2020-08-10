@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AzureFunctionsVersion>v3</AzureFunctionsVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="keyfile.p12" />
+    <None Remove="youtubecert.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="keyfile.p12">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="youtubecert.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis" Version="1.48.0" />
+    <PackageReference Include="Google.Apis.Analytics.v3" Version="1.48.0.1679" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.48.0" />
+    <PackageReference Include="Google.Apis.Books.v1" Version="1.48.0.2043" />
+    <PackageReference Include="Google.Apis.Core" Version="1.48.0" />
+    <PackageReference Include="Google.Apis.YouTube.v3" Version="1.47.0.2008" />
+    <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="3.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="host.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="local.settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+</Project>
