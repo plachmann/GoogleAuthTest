@@ -28,9 +28,13 @@ namespace GoogleAuthTest
             ILogger log, ExecutionContext context)
         {
             var res = "";
-         
+
+            // Crossroad Church(Main Channel):  UCEdRBpSpVgfuybR3lzgxa-Q
+            // Crossroad Church Music:  UC5w5QDnJIpeJR_KnLZSEg1Q
+            // Crossroad Kids' Club:  UCmMySSzKknjgAVVCOPXu_qg
+
             var youTube = new YouTube();
-            var videos = await youTube.GetVideosAsync();
+            var videos = await youTube.GetAllVideosAsync("UCEdRBpSpVgfuybR3lzgxa-Q");
 
             res += "List of Videos\n\n\n" + String.Format("Videos:\n{0}\n", string.Join("\n", videos));
             string responseMessage = res;
