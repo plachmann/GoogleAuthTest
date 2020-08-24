@@ -3,7 +3,6 @@ using System.Data.SqlClient;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using GoogleAuthTest.Models;
-using System.Linq.Expressions;
 
 namespace GoogleAuthTest
 {
@@ -16,11 +15,10 @@ namespace GoogleAuthTest
             var keyVault = new KeyVault();
             connectionString = keyVault.GetSecret("BRONZECONNECTIONSTRING");
         }
+
         public async Task<List<YouTubeChannelInfo>> GetChannelIds()
         {
             List<YouTubeChannelInfo> channels = new List<YouTubeChannelInfo>();
-            // Get the connection string from app settings and use it to create a connection.
-           // var str = Environment.GetEnvironmentVariable("sqldb_connection");
                 using (SqlConnection conn = new SqlConnection(connectionString))
             {
                 conn.Open();

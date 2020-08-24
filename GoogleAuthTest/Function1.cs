@@ -29,23 +29,17 @@ namespace GoogleAuthTest
             var youTube = new YouTube();
 
             var channels = await azuredb.GetChannelIds();
-            res += "List of Channels\n\n\n" + String.Format("Channels:\n{0}\n", string.Join("\n", channels));
-
-            foreach(var channel in channels)
+            
+            foreach (var channel in channels)
             {
                 var videoList = await youTube.SearchForVideosAsync2(channel.PlatformChannelID);
                 foreach (var video in videoList)
                 {
-                    var metrics = await youTube.GetMetricsForVideo(video,channel.YoutubeChannelID);
+                    var metrics = await youTube.GetMetricsForVideo(video, channel.YoutubeChannelID);
                     res += azuredb.InsertVideoMetrics(metrics);
                 }
             }
-
-           
-
-            string responseMessage = res;
-
-            return new OkObjectResult(responseMessage);
+            return new OkObjectResult(res);
         }
 
     }
