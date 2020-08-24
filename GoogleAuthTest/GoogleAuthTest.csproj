@@ -4,16 +4,17 @@
     <AzureFunctionsVersion>v3</AzureFunctionsVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.2.0" />
+    <PackageReference Include="Azure.Identity" Version="1.2.1" />
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.1.0" />
-    <PackageReference Include="Google.Apis" Version="1.48.0" />
-    <PackageReference Include="Google.Apis.Analytics.v3" Version="1.48.0.1679" />
-    <PackageReference Include="Google.Apis.Auth" Version="1.48.0" />
-    <PackageReference Include="Google.Apis.Books.v1" Version="1.48.0.2043" />
-    <PackageReference Include="Google.Apis.Core" Version="1.48.0" />
+    <PackageReference Include="Google.Apis" Version="1.49.0" />
+    <PackageReference Include="Google.Apis.Analytics.v3" Version="1.49.0.1679" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.49.0" />
+    <PackageReference Include="Google.Apis.Books.v1" Version="1.49.0.2055" />
+    <PackageReference Include="Google.Apis.Core" Version="1.49.0" />
     <PackageReference Include="Google.Apis.YouTube.v3" Version="1.47.0.2008" />
-    <PackageReference Include="Google.Apis.YouTubeAnalytics.v2" Version="1.48.0.2043" />
-    <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="3.0.3" />
+    <PackageReference Include="Google.Apis.YouTubeAnalytics.v2" Version="1.49.0.2056" />
+    <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="3.0.9" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.2" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

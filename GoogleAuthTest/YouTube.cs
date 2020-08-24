@@ -13,21 +13,30 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using Google.Apis.YouTube.v3.Data;
+using GoogleAuthTest.Models;
+using System.Linq;
 
 namespace GoogleAuthTest
 {
     class YouTube
     {
         private ServiceAccountCredential serviceAccountCredentials;
+        private YouTubeService youtubeService;
         public YouTube()
         {
             DoAuthentication();
+            youtubeService = new YouTubeService(
+               new BaseClientService.Initializer()
+               {
+                   HttpClientInitializer = serviceAccountCredentials,
+               }
+           );
         }
 
         private void DoAuthentication()
         {
             var keyVault = new KeyVault();
-            var jsonFromKeyVault = keyVault.GetSecret("SERVICEACCOUNTJSONYOUTUBEONLY");
+            var jsonFromKeyVault = keyVault.GetSecret("SERVICEACCOUNTJSONYOUTUBEONLY2");
 
             Newtonsoft.Json.Linq.JObject cr = (Newtonsoft.Json.Linq.JObject)JsonConvert.DeserializeObject(jsonFromKeyVault);
             string privateKey = (string)cr.GetValue("private_key");
@@ -42,13 +51,13 @@ namespace GoogleAuthTest
 
         public async Task<List<string>> SearchForVideosAsync(string searchText, int maxResults, string channelID)
         {
-            // Create the service
-            YouTubeService youtubeService = new YouTubeService(
-                new BaseClientService.Initializer()
-                {
-                    HttpClientInitializer = serviceAccountCredentials,
-                }
-            );
+            //// Create the service
+            //YouTubeService youtubeService = new YouTubeService(
+            //    new BaseClientService.Initializer()
+            //    {
+            //        HttpClientInitializer = serviceAccountCredentials,
+            //    }
+            //);
 
             var searchListRequest = youtubeService.Search.List("snippet");
             searchListRequest.Q = searchText;
@@ -96,13 +105,13 @@ namespace GoogleAuthTest
             List<string> videos = new List<string>();
             try
             {
-                // Create the service
-                YouTubeService youtubeService = new YouTubeService(
-                    new BaseClientService.Initializer()
-                    {
-                        HttpClientInitializer = serviceAccountCredentials,
-                    }
-                );
+                //// Create the service
+                //YouTubeService youtubeService = new YouTubeService(
+                //    new BaseClientService.Initializer()
+                //    {
+                //        HttpClientInitializer = serviceAccountCredentials,
+                //    }
+                //);
 
                 var channelsListRequest = youtubeService.Channels.List("contentDetails");
                 channelsListRequest.Id = channelID;
@@ -147,6 +156,76 @@ namespace GoogleAuthTest
                 videos.Add("Exception: " + ex.Message);
             }
             return videos;
+        }
+
+        public async Task<List<string>> SearchForVideosAsync2(string channelID)
+        {
+            List<string> videos = new List<string>();
+            var nextPageToken = "";
+
+            try { 
+            //while (nextPageToken != null)
+            //{
+                var searchListRequest = youtubeService.Search.List("snippet");
+                searchListRequest.MaxResults = 50;
+                searchListRequest.ChannelId = channelID;
+                searchListRequest.Type = "video";
+                searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Date;
+                searchListRequest.PageToken = nextPageToken;
+
+                // Call the search.list method to retrieve results matching the specified query term.
+                var searchListResponse = await searchListRequest.ExecuteAsync();
+
+                foreach (var searchlistItem in searchListResponse.Items)
+                {
+                    // Print information about each video.
+                    videos.Add(searchlistItem.Snippet.Title + " " + searchlistItem.Id.VideoId + " " + searchlistItem.Snippet.PublishedAt.ToString());
+                }
+
+                nextPageToken = searchListResponse.NextPageToken;
+            //}
+            }
+            catch (Exception ex)
+            {
+
+                videos.Add("Exception: " + ex.Message);
+            }
+
+            return videos;
+        }
+
+        public async Task<YouTubeVideoMetricsRecord> GetMetricsForVideo(string videoID, int youtubeChannelID)
+        {
+            var videoMetricsRequest = youtubeService.Videos.List("snippet,statistics,contentDetails");
+            videoMetricsRequest.Id = videoID;
+
+            var videoMetricsResponse = await videoMetricsRequest.ExecuteAsync();
+
+            var item = videoMetricsResponse.Items.First();
+            DateTime publishedAt;
+            DateTime now = DateTime.Now;
+            var youTubeVideoMetricsRecord = new YouTubeVideoMetricsRecord();
+            youTubeVideoMetricsRecord.YouTubeChannelId = youtubeChannelID;
+            youTubeVideoMetricsRecord.PostContentId = videoID;
+            youTubeVideoMetricsRecord.Title =item.Snippet.Title;
+            youTubeVideoMetricsRecord.VideoUrl = "Not Available";
+            youTubeVideoMetricsRecord.AuthorDisplayName = item.Snippet.ChannelTitle;
+            youTubeVideoMetricsRecord.VideoDurationSeconds = ConvertToSeconds(item.ContentDetails.Duration);
+            youTubeVideoMetricsRecord.Views = item.Statistics.ViewCount != null ? (ulong)item.Statistics.ViewCount : 0;
+            youTubeVideoMetricsRecord.Likes = item.Statistics.LikeCount != null ? (ulong)item.Statistics.LikeCount : 0;
+            youTubeVideoMetricsRecord.Dislikes = item.Statistics.DislikeCount != null ? (ulong)item.Statistics.DislikeCount : 0;
+            youTubeVideoMetricsRecord.Replies = item.Statistics.CommentCount != null ? (ulong)item.Statistics.CommentCount : 0;
+            youTubeVideoMetricsRecord.Shares = 0; //not available
+            youTubeVideoMetricsRecord.EngagementTotal = 0; //not available
+            youTubeVideoMetricsRecord.PostDateTime = DateTime.TryParse(item.Snippet.PublishedAt, out publishedAt) ? publishedAt: new DateTime(1999,1,1);
+            youTubeVideoMetricsRecord.CreateDateTime = now;
+            youTubeVideoMetricsRecord.UpdateDateTime = now;
+            return youTubeVideoMetricsRecord;
+        }
+
+        private int ConvertToSeconds(string ptString)
+        {
+            return 1;
         }
     }
 }
