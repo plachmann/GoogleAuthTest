@@ -13,8 +13,8 @@ namespace GoogleAuthTest
 
         public AzureDB()
         {
-            connectionString = "Server=tcp:crds-insights.database.windows.net,1433;Initial Catalog=insights_bronze;Persist Security Info=False;User ID=crdsadmin;Password=HotSummer2020;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
-
+            var keyVault = new KeyVault();
+            connectionString = keyVault.GetSecret("BRONZECONNECTIONSTRING");
         }
         public async Task<List<YouTubeChannelInfo>> GetChannelIds()
         {
