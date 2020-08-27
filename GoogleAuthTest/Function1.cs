@@ -36,7 +36,10 @@ namespace GoogleAuthTest
                 foreach (var video in videoList)
                 {
                     var metrics = await youTube.GetMetricsForVideo(video, channel.YoutubeChannelID);
-                    res += azuredb.InsertVideoMetrics(metrics);
+                    //res += azuredb.InsertVideoMetrics(metrics);
+
+                    var a = await youTube.GetAnalyticsForVideo(video, channel.PlatformChannelID);
+                    res += a;
                 }
             }
             return new OkObjectResult(res);
