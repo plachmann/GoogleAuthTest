@@ -20,6 +20,13 @@ using Google.Apis.Util.Store;
 
 namespace GoogleAuthTest
 {
+    // service account authentication works for the youtubedata api 
+    // youtube analytics api will not work with a service account. owner of the channel must authenticate.
+    // These 3 stackoverflow posts led me to a way to authenticate for the youtube analytics api
+    //       https://stackoverflow.com/questions/41016537/youtube-apis-access-mutiple-youtube-channels-brand-accounts-using-google-adm
+    //       https://stackoverflow.com/questions/38981720/get-refresh-token-in-google-oauth2-0-net
+    //       https://stackoverflow.com/questions/38390197/how-to-create-a-instance-of-usercredential-if-i-already-have-the-value-of-access
+
     class YouTube
     {
         private ServiceAccountCredential serviceAccountCredentials;
@@ -27,10 +34,7 @@ namespace GoogleAuthTest
         private YouTubeAnalyticsService youtubeAnalyticsService;
         private YouTubeReportingService youtubeReportingService;
 
-        private string clientid = "411507659347-ub6sojqkhoqmsqq6u7n5foi6fd8gf8il.apps.googleusercontent.com";
-        private string clientsecret = "NbEXppWhX9_mWrXIS96KNcDr";
-        private string refreshToken = "1//04huizcwkZIqdCgYIARAAGAQSNwF-L9IrEidC80b41oYu9y9Sm1GT7KqX22sFrnSWUOGmHfvG_vHF1N6hdga2SiX5lC17Jyn63_Y";
-        public YouTube()
+        public YouTube(YouTubeChannelInfo channelInfo)
         {
             DoAuthentication();
             youtubeService = new YouTubeService(
@@ -43,7 +47,7 @@ namespace GoogleAuthTest
             youtubeAnalyticsService = new YouTubeAnalyticsService(
                 new BaseClientService.Initializer()
                 {
-                    HttpClientInitializer = GetCredentionsForAnalytics(),
+                    HttpClientInitializer = GetCredentialsForAnalytics(channelInfo),
                 }
             );
 
@@ -87,33 +91,55 @@ namespace GoogleAuthTest
                 searchListRequest.Type = "video";
                 searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Date;
                 
-                
-
                 // Call the search.list method to retrieve results matching the specified query term.
                 var searchListResponse = await searchListRequest.ExecuteAsync();
 
                 foreach (var searchlistItem in searchListResponse.Items)
                 {
-                    // Print information about each video.
                     videos.Add(searchlistItem.Id.VideoId );
                 }
-
-                
-            //}
             }
             catch (Exception ex)
             {
-
                 videos.Add("Exception: " + ex.Message);
             }
-
             return videos;
         }
 
-        public async Task<YouTubeVideoMetricsRecord> GetMetricsForVideo(string videoID, int youtubeChannelID)
+        public async Task<YouTubeChannelMetricsRecord> GetMetricsForChannel(int youtubeChannelID, string platformChannelID)
         {
-            var youTubeVideoMetricsRecord = new YouTubeVideoMetricsRecord();
-            youTubeVideoMetricsRecord.PostContentId = videoID;
+            var youTubeChannelMetricsRecord = new YouTubeChannelMetricsRecord
+            {
+                YouTubeChannelID = youtubeChannelID,
+                PlatformChannelID = platformChannelID
+            };
+
+            try
+            {
+                var channelMetricsRequest = youtubeService.Channels.List("statistics");
+                channelMetricsRequest.Id = platformChannelID;
+
+                var channelMetricsResponse = await channelMetricsRequest.ExecuteAsync();
+                var item = channelMetricsResponse.Items.First();
+
+                youTubeChannelMetricsRecord.SubscriberCount = item.Statistics.SubscriberCount != null ? Convert.ToInt32(item.Statistics.SubscriberCount.ToString()) : 0;
+                youTubeChannelMetricsRecord.VideoCount = item.Statistics.VideoCount != null ? Convert.ToInt32(item.Statistics.VideoCount.ToString()) : 0;
+                youTubeChannelMetricsRecord.ViewCount = item.Statistics.ViewCount != null ? Convert.ToInt32(item.Statistics.ViewCount.ToString()) : 0;
+            }
+            catch(Exception ex)
+            {
+                throw ex;
+            }
+            return youTubeChannelMetricsRecord;
+        }
+
+        public async Task<YouTubeVideoMetricsRecord> GetMetricsForVideo(string videoID, int youtubeChannelID,string platformChannelID)
+        {
+            var youTubeVideoMetricsRecord = new YouTubeVideoMetricsRecord
+            {
+                PostContentId = videoID
+            };
+
             try
             {
                 var videoMetricsRequest = youtubeService.Videos.List("snippet,statistics,contentDetails");
@@ -125,110 +151,67 @@ namespace GoogleAuthTest
                 DateTime publishedAt;
                 DateTime now = DateTime.Now;
 
+                youTubeVideoMetricsRecord.PlatformChannelID = platformChannelID;
                 youTubeVideoMetricsRecord.YouTubeChannelId = youtubeChannelID;
                 youTubeVideoMetricsRecord.PostContentId = videoID;
                 youTubeVideoMetricsRecord.Title = item.Snippet.Title;
-                youTubeVideoMetricsRecord.VideoUrl = "Not Available";
                 youTubeVideoMetricsRecord.AuthorDisplayName = item.Snippet.ChannelTitle;
                 youTubeVideoMetricsRecord.VideoDurationSeconds = ConvertToSeconds(item.ContentDetails.Duration);
                 youTubeVideoMetricsRecord.Views = item.Statistics.ViewCount != null ? Convert.ToInt32(item.Statistics.ViewCount.ToString()) : 0;
                 youTubeVideoMetricsRecord.Likes = item.Statistics.LikeCount != null ? Convert.ToInt32(item.Statistics.LikeCount.ToString()) : 0;
                 youTubeVideoMetricsRecord.Dislikes = item.Statistics.DislikeCount != null ? Convert.ToInt32(item.Statistics.DislikeCount.ToString()) : 0;
-                youTubeVideoMetricsRecord.Replies = item.Statistics.CommentCount != null ? Convert.ToInt32(item.Statistics.CommentCount.ToString()) : 0;
-                youTubeVideoMetricsRecord.Shares = 0; //not available
-                youTubeVideoMetricsRecord.EngagementTotal = 0; //not available
+                youTubeVideoMetricsRecord.Comments = item.Statistics.CommentCount != null ? Convert.ToInt32(item.Statistics.CommentCount.ToString()) : 0;
                 youTubeVideoMetricsRecord.PostDateTime = DateTime.TryParse(item.Snippet.PublishedAt, out publishedAt) ? publishedAt : new DateTime(1999, 1, 1);
                 youTubeVideoMetricsRecord.CreateDateTime = now;
                 youTubeVideoMetricsRecord.UpdateDateTime = now;
-            }
-            catch(Exception ex)
-            {
-                youTubeVideoMetricsRecord.Title = ex.Message;
-            }
-            return youTubeVideoMetricsRecord;
-        }
 
-        public async Task<string> GetAnalyticsForVideo(string videoID, string channelID)
-        {
-            var z = "empty";
-
-            try
-            {
-                var x = youtubeAnalyticsService.Reports.Query();
-                x.Metrics = "views";
-                x.Ids = "channel==" + channelID;
-                x.StartDate = "2020-01-01";
-                x.EndDate = "2020-02-01";
-                x.Dimensions = "video";
-                x.Filters = "video==" + videoID;
-
-                var y = await x.ExecuteAsync();
-
-                z = "row=" + y.Rows.ToString();
-            }
-            catch(Exception ex)
-            {
-                z = ex.Message;
-            }
-             
-            return z;
-        }
-
-       
-
-        public async Task<string> TryReporting(string channelID)
-        {
-            var z = "empty";
-
-            try
-            {
-                var x = youtubeReportingService.ReportTypes.List();
-                
-
-                x.OnBehalfOfContentOwner = channelID;
-
-                var y = await x.ExecuteAsync();
-
-                z = "row=" + y.ReportTypes.ToString();
+                //get the last few metrics from the analytics api.
+                youTubeVideoMetricsRecord = await GetAnalyticsForVideo(youTubeVideoMetricsRecord);
             }
             catch (Exception ex)
             {
-                z = ex.Message;
+                throw ex;
             }
 
-            return z;
-        }
-
-        public void restcall()
-        {
-            var url = "https://api.simplymeasured.com/v1/analytics/81e45232-9dfd-4ea2-939e-444777cb1860/profiles";
-            //var token = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoiY291cnRuZXkud2VsY2hAY3Jvc3Nyb2Fkcy5uZXQiLCJmaXJzdF9uYW1lIjoiQ291cnRuZXkiLCJsYXN0X25hbWUiOiJXZWxjaCJ9LCJ1c2VyX2lkIjoiYXV0aDB8OGE4MWM3YTUtNzY4Yy00OWFmLWFhNWMtNTgwZGI2MzEyN2UxIiwicmF0ZWxpbWl0Ijp7Im1vbnRoIjoxMDAwLCJtaW51dGUiOjUwMH0sImFjY291bnRfaWQiOiI4MWU0NTIzMi05ZGZkLTRlYTItOTM5ZS00NDQ3NzdjYjE4NjAiLCJpc3MiOiJodHRwczovL3NpbXBseW1lYXN1cmVkLXByb2QuYXV0aDAuY29tLyIsInN1YiI6ImF1dGgwfDhhODFjN2E1LTc2OGMtNDlhZi1hYTVjLTU4MGRiNjMxMjdlMSIsImF1ZCI6IlB3RHNMNHJSVjd6dkdzM2hhd1FBcjc1SFpsSVNpZktOIiwiZXhwIjoxNTg3NDIxMDcwLCJpYXQiOjE1ODczODUwNzAsImF6cCI6Im1TZDNJQjNucGd6VzI1bkduMEl4eTFTZUw3VjJFS0tFIn0.CAqIhSPuBFWFFZI7vsqKUXSTpGJZMwfA8JBh2QD2Dqw";
-
-            var token_only = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoiY291cnRuZXkud2VsY2hAY3Jvc3Nyb2Fkcy5uZXQiLCJmaXJzdF9uYW1lIjoiQ291cnRuZXkiLCJsYXN0X25hbWUiOiJXZWxjaCJ9LCJ1c2VyX2lkIjoiYXV0aDB8OGE4MWM3YTUtNzY4Yy00OWFmLWFhNWMtNTgwZGI2MzEyN2UxIiwicmF0ZWxpbWl0Ijp7Im1vbnRoIjoxMDAwLCJtaW51dGUiOjUwMH0sImFjY291bnRfaWQiOiI4MWU0NTIzMi05ZGZkLTRlYTItOTM5ZS00NDQ3NzdjYjE4NjAiLCJpc3MiOiJodHRwczovL3NpbXBseW1lYXN1cmVkLXByb2QuYXV0aDAuY29tLyIsInN1YiI6ImF1dGgwfDhhODFjN2E1LTc2OGMtNDlhZi1hYTVjLTU4MGRiNjMxMjdlMSIsImF1ZCI6IlB3RHNMNHJSVjd6dkdzM2hhd1FBcjc1SFpsSVNpZktOIiwiZXhwIjoxNTg3NTA3MTQ1LCJpYXQiOjE1ODc0NzExNDUsImF6cCI6Im1TZDNJQjNucGd6VzI1bkduMEl4eTFTZUw3VjJFS0tFIn0.c4EgZeG029NLUlRi6veZMHTbo1sIWPeed0W-cxhhaoc";
-            var token = "Bearer " + token_only;
-
-            var client = new WebClient();
-            client.Headers.Add(HttpRequestHeader.Authorization, token);
-
             
-
-            var response = client.DownloadString(url);
-
-            // parse the JSON
-            JObject rss = JObject.Parse(response);
-
-
-            string channel = (string)rss["data"][0]["attributes"]["fields"]["channel"];
-            string profileid = (string)rss["data"][0]["attributes"]["fields"]["profile.id"];
-            string profilelink = (string)rss["data"][0]["attributes"]["fields"]["profile.link"];
-            string profilehandle = (string)rss["data"][0]["attributes"]["fields"]["profile.handle"];
-            string profiledisplayname = (string)rss["data"][0]["attributes"]["fields"]["profile.display_name"];
-            string audiencecount = (string)rss["data"][0]["attributes"]["metrics"]["profile.audience_count"];
-
-            Console.WriteLine("channel = " + channel);
+            return youTubeVideoMetricsRecord;
         }
 
-        public UserCredential GetCredentionsForAnalytics()
+        private async Task<YouTubeVideoMetricsRecord> GetAnalyticsForVideo(YouTubeVideoMetricsRecord metricsRecord)
+        {
+            try
+            {
+                var query = youtubeAnalyticsService.Reports.Query();
+                query.Metrics = "shares,estimatedMinutesWatched,averageViewDuration,averageViewPercentage";
+                query.Ids = "channel==" + metricsRecord.PlatformChannelID;
+                query.StartDate = "1980-01-01";
+                query.EndDate = "2099-01-01";
+                query.Dimensions = "video";
+                query.Filters = "video==" + metricsRecord.PostContentId;
+
+                var queryResponse = await query.ExecuteAsync();
+              
+                if (queryResponse.Rows != null)
+                {
+                    if(queryResponse.Rows.Count > 0)
+                    {
+                        var rowRecord = queryResponse.Rows.First();
+                        // element 0 is the video id, skip it
+                        metricsRecord.Shares = Convert.ToInt32(rowRecord.ElementAt(1).ToString());
+                        metricsRecord.EstimatedMinutesWatched = Convert.ToInt32(rowRecord.ElementAt(2).ToString());
+                        metricsRecord.AverageViewDurationSeconds = Convert.ToInt32(rowRecord.ElementAt(3).ToString());
+                        metricsRecord.AverageViewPercentage = rowRecord.ElementAt(4).ToString();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+            return metricsRecord;
+        }
+
+        public UserCredential GetCredentialsForAnalytics(YouTubeChannelInfo channelInfo)
         { 
             string[] scopes = new string[] {YouTubeAnalyticsService.Scope.YoutubeReadonly,
                                         YouTubeAnalyticsService.Scope.YtAnalyticsReadonly};
@@ -237,8 +220,8 @@ namespace GoogleAuthTest
             {
                 ClientSecrets = new ClientSecrets
                 {
-                    ClientId = this.clientid,
-                    ClientSecret = this.clientsecret
+                    ClientId = channelInfo.ClientID,
+                    ClientSecret = channelInfo.ClientSecret
                 },
                 Scopes = scopes,
                 DataStore = new FileDataStore("Store")
@@ -246,18 +229,18 @@ namespace GoogleAuthTest
 
             var token = new TokenResponse
             {
-                AccessToken = getAccessToken(),
-                RefreshToken = this.refreshToken
+                AccessToken = getAccessToken(channelInfo),
+                RefreshToken = channelInfo.RefreshToken
             };
 
             return new UserCredential(flow, Environment.UserName, token);
         }
 
-        private string getAccessToken()
+        private string getAccessToken(YouTubeChannelInfo channelInfo)
         {
             string rc = "";
             string URI = "https://accounts.google.com/o/oauth2/token";
-            string myParameters = $"grant_type=refresh_token&client_id={clientid}&client_secret={clientsecret}&refresh_token={refreshToken}";
+            string myParameters = $"grant_type=refresh_token&client_id={channelInfo.ClientID}&client_secret={channelInfo.ClientSecret}&refresh_token={channelInfo.RefreshToken}";
             try
             {
                 using (WebClient wc = new WebClient())

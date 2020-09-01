@@ -5,7 +5,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-
+using Newtonsoft.Json;
 
 namespace GoogleAuthTest
 {
@@ -26,20 +26,26 @@ namespace GoogleAuthTest
             // Crossroad Kids' Club:  UCmMySSzKknjgAVVCOPXu_qg
 
             var azuredb = new AzureDB();
-            var youTube = new YouTube();
 
             var channels = await azuredb.GetChannelIds();
             
             foreach (var channel in channels)
             {
+                var youTube = new YouTube(channel);
+
+                //get some metrics for the channel
+                var channelMetrics = await youTube.GetMetricsForChannel(channel.YoutubeChannelID, channel.PlatformChannelID);
+                string formattedJson = JsonConvert.SerializeObject(channelMetrics, Formatting.Indented);
+                res += formattedJson + "\n\n";
+
+                //get metrics for the videos
                 var videoList = await youTube.SearchForVideosAsync2(channel.PlatformChannelID);
                 foreach (var video in videoList)
                 {
-                    var metrics = await youTube.GetMetricsForVideo(video, channel.YoutubeChannelID);
-                    //res += azuredb.InsertVideoMetrics(metrics);
+                    var metrics = await youTube.GetMetricsForVideo(video, channel.YoutubeChannelID, channel.PlatformChannelID);
+                    res += azuredb.InsertVideoMetrics(metrics);
 
-                    var a = await youTube.GetAnalyticsForVideo(video, channel.PlatformChannelID);
-                    res += a;
+                    //res += "title: " + metrics.Title + "\n";
                 }
             }
             return new OkObjectResult(res);
