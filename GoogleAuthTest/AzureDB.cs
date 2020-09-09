@@ -22,7 +22,7 @@ namespace GoogleAuthTest
                 using (SqlConnection conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var text = "SELECT PlatformChannelID, YoutubeChannelID, ClientID, ClientSecret, RefreshToken from dimYouTubeChannel";
+                var text = "SELECT PlatformChannelID, YoutubeChannelID, ClientID, ClientSecret, RefreshToken from dimYouTubeChannel where active = 1";
 
                 using (SqlCommand cmd = new SqlCommand(text, conn))
                 {
@@ -54,7 +54,20 @@ namespace GoogleAuthTest
             var rc = "channel metrics inserted successfully\n";
             try
             {
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    var cmd = new SqlCommand("insert into YoutubeChannelMetrics(YoutubeChannelID,SubscriberCount,VideoCount,ViewCount,CreateDatetime,UpdateDatetime) " +
+                        "values (@youtubeChannelID,@subscriberCount,@videoCount,@viewCount,@createDatetime,@updateDatetime)", conn);
 
+                    cmd.Parameters.AddWithValue("@youtubeChannelID", channelMetricsRecord.YouTubeChannelID);
+                    cmd.Parameters.AddWithValue("@subscriberCount", channelMetricsRecord.SubscriberCount);
+                    cmd.Parameters.AddWithValue("@videoCount", channelMetricsRecord.VideoCount);
+                    cmd.Parameters.AddWithValue("@viewCount", channelMetricsRecord.ViewCount);
+                    cmd.Parameters.AddWithValue("@createDatetime", channelMetricsRecord.CreateDateTime);
+                    cmd.Parameters.AddWithValue("@updateDatetime", channelMetricsRecord.UpdateDateTime);
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
             }
             catch(Exception ex)
             {
@@ -65,7 +78,7 @@ namespace GoogleAuthTest
 
         public string InsertVideoMetrics(YouTubeVideoMetricsRecord videoMetricsRecord)
         {
-            var rc = "insert success for " + videoMetricsRecord.PostContentId;
+            var rc = "insert success for " + videoMetricsRecord.PostContentId + "\n";
             try
             {
                 using (var conn = new SqlConnection(connectionString))

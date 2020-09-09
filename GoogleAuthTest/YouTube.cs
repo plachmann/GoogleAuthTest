@@ -72,8 +72,8 @@ namespace GoogleAuthTest
             // Create an explicit ServiceAccountCredential credential
             serviceAccountCredentials = new ServiceAccountCredential(new ServiceAccountCredential.Initializer(clientEMail)
             {
-                Scopes = new[] { YouTubeService.Scope.YoutubeReadonly, 
-                                 YouTubeAnalyticsService.Scope.YoutubeReadonly, 
+                Scopes = new[] { YouTubeService.Scope.YoutubeReadonly,
+                                 YouTubeAnalyticsService.Scope.YoutubeReadonly,
                                  YouTubeAnalyticsService.Scope.YtAnalyticsReadonly,
                                  YouTubeReportingService.Scope.YtAnalyticsReadonly}
             }.FromPrivateKey(privateKey));
@@ -82,26 +82,31 @@ namespace GoogleAuthTest
         public async Task<List<string>> SearchForVideosAsync2(string channelID)
         {
             List<string> videos = new List<string>();
-            
-            try { 
-            
-                var searchListRequest = youtubeService.Search.List("snippet");
-                searchListRequest.MaxResults = 50;
-                searchListRequest.ChannelId = channelID;
-                searchListRequest.Type = "video";
-                searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Date;
-                
-                // Call the search.list method to retrieve results matching the specified query term.
-                var searchListResponse = await searchListRequest.ExecuteAsync();
+            var nextPageToken = "";
 
-                foreach (var searchlistItem in searchListResponse.Items)
-                {
-                    videos.Add(searchlistItem.Id.VideoId );
-                }
+            try
+            {
+                //while (nextPageToken != null)
+                //{
+                    var searchListRequest = youtubeService.Search.List("snippet");
+                    searchListRequest.MaxResults = 5;
+                    searchListRequest.ChannelId = channelID;
+                    searchListRequest.Type = "video";
+                    searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Date;
+                    searchListRequest.PageToken = nextPageToken;
+
+                    var searchListResponse = await searchListRequest.ExecuteAsync();
+
+                    foreach (var searchlistItem in searchListResponse.Items)
+                    {
+                        videos.Add(searchlistItem.Id.VideoId);
+                    }
+                    nextPageToken = searchListResponse.NextPageToken;
+                //}
             }
             catch (Exception ex)
             {
-                videos.Add("Exception: " + ex.Message);
+                throw ex;
             }
             return videos;
         }
@@ -116,6 +121,8 @@ namespace GoogleAuthTest
 
             try
             {
+                DateTime estDateTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
+
                 var channelMetricsRequest = youtubeService.Channels.List("statistics");
                 channelMetricsRequest.Id = platformChannelID;
 
@@ -125,15 +132,17 @@ namespace GoogleAuthTest
                 youTubeChannelMetricsRecord.SubscriberCount = item.Statistics.SubscriberCount != null ? Convert.ToInt32(item.Statistics.SubscriberCount.ToString()) : 0;
                 youTubeChannelMetricsRecord.VideoCount = item.Statistics.VideoCount != null ? Convert.ToInt32(item.Statistics.VideoCount.ToString()) : 0;
                 youTubeChannelMetricsRecord.ViewCount = item.Statistics.ViewCount != null ? Convert.ToInt32(item.Statistics.ViewCount.ToString()) : 0;
+                youTubeChannelMetricsRecord.CreateDateTime = estDateTime;
+                youTubeChannelMetricsRecord.UpdateDateTime = estDateTime;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 throw ex;
             }
             return youTubeChannelMetricsRecord;
         }
 
-        public async Task<YouTubeVideoMetricsRecord> GetMetricsForVideo(string videoID, int youtubeChannelID,string platformChannelID)
+        public async Task<YouTubeVideoMetricsRecord> GetMetricsForVideo_Async(string videoID, int youtubeChannelID, string platformChannelID)
         {
             var youTubeVideoMetricsRecord = new YouTubeVideoMetricsRecord
             {
@@ -149,7 +158,7 @@ namespace GoogleAuthTest
 
                 var item = videoMetricsResponse.Items.First();
                 DateTime publishedAt;
-                DateTime now = DateTime.Now;
+                DateTime estDateTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
 
                 youTubeVideoMetricsRecord.PlatformChannelID = platformChannelID;
                 youTubeVideoMetricsRecord.YouTubeChannelId = youtubeChannelID;
@@ -162,22 +171,66 @@ namespace GoogleAuthTest
                 youTubeVideoMetricsRecord.Dislikes = item.Statistics.DislikeCount != null ? Convert.ToInt32(item.Statistics.DislikeCount.ToString()) : 0;
                 youTubeVideoMetricsRecord.Comments = item.Statistics.CommentCount != null ? Convert.ToInt32(item.Statistics.CommentCount.ToString()) : 0;
                 youTubeVideoMetricsRecord.PostDateTime = DateTime.TryParse(item.Snippet.PublishedAt, out publishedAt) ? publishedAt : new DateTime(1999, 1, 1);
-                youTubeVideoMetricsRecord.CreateDateTime = now;
-                youTubeVideoMetricsRecord.UpdateDateTime = now;
+                youTubeVideoMetricsRecord.CreateDateTime = estDateTime;
+                youTubeVideoMetricsRecord.UpdateDateTime = estDateTime;
 
                 //get the last few metrics from the analytics api.
-                youTubeVideoMetricsRecord = await GetAnalyticsForVideo(youTubeVideoMetricsRecord);
+                youTubeVideoMetricsRecord = await GetAnalyticsForVideo_Async(youTubeVideoMetricsRecord);
             }
             catch (Exception ex)
             {
                 throw ex;
             }
 
-            
+
             return youTubeVideoMetricsRecord;
         }
 
-        private async Task<YouTubeVideoMetricsRecord> GetAnalyticsForVideo(YouTubeVideoMetricsRecord metricsRecord)
+        public YouTubeVideoMetricsRecord GetMetricsForVideo(string videoID, int youtubeChannelID, string platformChannelID)
+        {
+            var youTubeVideoMetricsRecord = new YouTubeVideoMetricsRecord
+            {
+                PostContentId = videoID
+            };
+
+            try
+            {
+                var videoMetricsRequest = youtubeService.Videos.List("snippet,statistics,contentDetails");
+                videoMetricsRequest.Id = videoID;
+
+                var videoMetricsResponse = videoMetricsRequest.Execute();
+
+                var item = videoMetricsResponse.Items.First();
+                DateTime publishedAt;
+                DateTime estDateTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
+
+                youTubeVideoMetricsRecord.PlatformChannelID = platformChannelID;
+                youTubeVideoMetricsRecord.YouTubeChannelId = youtubeChannelID;
+                youTubeVideoMetricsRecord.PostContentId = videoID;
+                youTubeVideoMetricsRecord.Title = item.Snippet.Title;
+                youTubeVideoMetricsRecord.AuthorDisplayName = item.Snippet.ChannelTitle;
+                youTubeVideoMetricsRecord.VideoDurationSeconds = ConvertToSeconds(item.ContentDetails.Duration);
+                youTubeVideoMetricsRecord.Views = item.Statistics.ViewCount != null ? Convert.ToInt32(item.Statistics.ViewCount.ToString()) : 0;
+                youTubeVideoMetricsRecord.Likes = item.Statistics.LikeCount != null ? Convert.ToInt32(item.Statistics.LikeCount.ToString()) : 0;
+                youTubeVideoMetricsRecord.Dislikes = item.Statistics.DislikeCount != null ? Convert.ToInt32(item.Statistics.DislikeCount.ToString()) : 0;
+                youTubeVideoMetricsRecord.Comments = item.Statistics.CommentCount != null ? Convert.ToInt32(item.Statistics.CommentCount.ToString()) : 0;
+                youTubeVideoMetricsRecord.PostDateTime = DateTime.TryParse(item.Snippet.PublishedAt, out publishedAt) ? publishedAt : new DateTime(1999, 1, 1);
+                youTubeVideoMetricsRecord.CreateDateTime = estDateTime;
+                youTubeVideoMetricsRecord.UpdateDateTime = estDateTime;
+
+                //get the last few metrics from the analytics api.
+                youTubeVideoMetricsRecord = GetAnalyticsForVideo(youTubeVideoMetricsRecord);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
+
+            return youTubeVideoMetricsRecord;
+        }
+
+        private async Task<YouTubeVideoMetricsRecord> GetAnalyticsForVideo_Async(YouTubeVideoMetricsRecord metricsRecord)
         {
             try
             {
@@ -190,10 +243,56 @@ namespace GoogleAuthTest
                 query.Filters = "video==" + metricsRecord.PostContentId;
 
                 var queryResponse = await query.ExecuteAsync();
-              
+
+                //default values
+                metricsRecord.Shares = 0;
+                metricsRecord.EstimatedMinutesWatched = 0;
+                metricsRecord.AverageViewDurationSeconds = 0;
+                metricsRecord.AverageViewPercentage = "0";
+
                 if (queryResponse.Rows != null)
                 {
-                    if(queryResponse.Rows.Count > 0)
+                    if (queryResponse.Rows.Count > 0)
+                    {
+                        var rowRecord = queryResponse.Rows.First();
+                        // element 0 is the video id, skip it
+                        metricsRecord.Shares = Convert.ToInt32(rowRecord.ElementAt(1).ToString());
+                        metricsRecord.EstimatedMinutesWatched = Convert.ToInt32(rowRecord.ElementAt(2).ToString());
+                        metricsRecord.AverageViewDurationSeconds = Convert.ToInt32(rowRecord.ElementAt(3).ToString());
+                        metricsRecord.AverageViewPercentage = rowRecord.ElementAt(4).ToString();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+            return metricsRecord;
+        }
+
+        private YouTubeVideoMetricsRecord GetAnalyticsForVideo(YouTubeVideoMetricsRecord metricsRecord)
+        {
+            try
+            {
+                var query = youtubeAnalyticsService.Reports.Query();
+                query.Metrics = "shares,estimatedMinutesWatched,averageViewDuration,averageViewPercentage";
+                query.Ids = "channel==" + metricsRecord.PlatformChannelID;
+                query.StartDate = "1980-01-01";
+                query.EndDate = "2099-01-01";
+                query.Dimensions = "video";
+                query.Filters = "video==" + metricsRecord.PostContentId;
+
+                var queryResponse = query.Execute();
+
+                //default values
+                metricsRecord.Shares = 0;
+                metricsRecord.EstimatedMinutesWatched = 0;
+                metricsRecord.AverageViewDurationSeconds = 0;
+                metricsRecord.AverageViewPercentage = "0";
+
+                if (queryResponse.Rows != null)
+                {
+                    if (queryResponse.Rows.Count > 0)
                     {
                         var rowRecord = queryResponse.Rows.First();
                         // element 0 is the video id, skip it
@@ -212,7 +311,7 @@ namespace GoogleAuthTest
         }
 
         public UserCredential GetCredentialsForAnalytics(YouTubeChannelInfo channelInfo)
-        { 
+        {
             string[] scopes = new string[] {YouTubeAnalyticsService.Scope.YoutubeReadonly,
                                         YouTubeAnalyticsService.Scope.YtAnalyticsReadonly};
 
@@ -248,10 +347,10 @@ namespace GoogleAuthTest
                     wc.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded";
                     string response = wc.UploadString(URI, myParameters);
                     JObject rss = JObject.Parse(response);
-                    rc =  "" + rss["access_token"];
+                    rc = "" + rss["access_token"];
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 rc = ex.Message;
             }
