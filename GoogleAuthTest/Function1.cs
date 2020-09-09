@@ -66,7 +66,6 @@ namespace GoogleAuthTest
 
 
         [FunctionName("WriteToQueue")]
-        [return: Queue("myqueue")]
         public static async Task<IActionResult> Run2(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log, ExecutionContext context)
         {
@@ -74,7 +73,7 @@ namespace GoogleAuthTest
             try
             {
                 // https://docs.microsoft.com/en-us/azure/storage/queues/storage-tutorial-queues?tabs=dotnet
-                var connectionString = "DefaultEndpointsProtocol=https;AccountName=storageaccountinsigb34c;AccountKey=3Qyt6BFfSEl9AdNczDlfGkA5FWdjQXbY1pLwLVKYSVoVDkM9ZqpaDOHE8ZXev1WHA8M4wdrgXoq6NcyyZTnwtA==;EndpointSuffix=core.windows.net";
+                string connectionString = Environment.GetEnvironmentVariable("QUEUECONNECTION");
                 QueueClient queue = new QueueClient(connectionString, "youtubevideoanalytics");
 
                 if (null != await queue.CreateIfNotExistsAsync())
@@ -83,6 +82,7 @@ namespace GoogleAuthTest
                 }
 
                 await queue.SendMessageAsync("Message from my azure function");
+
             }
             catch(Exception ex)
             {
