@@ -62,7 +62,7 @@ namespace GoogleAuthTest
         private void DoAuthentication()
         {
             var keyVault = new KeyVault();
-            var jsonFromKeyVault = keyVault.GetSecret("SERVICEACCOUNTJSONYOUTUBEONLY2");
+            var jsonFromKeyVault = keyVault.GetSecret("SERVICEACCOUNTJSON");
 
             Newtonsoft.Json.Linq.JObject cr = (Newtonsoft.Json.Linq.JObject)JsonConvert.DeserializeObject(jsonFromKeyVault);
             string privateKey = (string)cr.GetValue("private_key");
@@ -86,14 +86,17 @@ namespace GoogleAuthTest
 
             try
             {
-                //while (nextPageToken != null)
-                //{
+                while (nextPageToken != null)
+                {
                     var searchListRequest = youtubeService.Search.List("snippet");
-                    searchListRequest.MaxResults = 5;
+                    searchListRequest.MaxResults = 50;
                     searchListRequest.ChannelId = channelID;
                     searchListRequest.Type = "video";
                     searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Date;
-                    searchListRequest.PageToken = nextPageToken;
+                    if (nextPageToken != "")
+                    {
+                        searchListRequest.PageToken = nextPageToken;
+                    }
 
                     var searchListResponse = await searchListRequest.ExecuteAsync();
 
@@ -101,8 +104,9 @@ namespace GoogleAuthTest
                     {
                         videos.Add(searchlistItem.Id.VideoId);
                     }
+                    
                     nextPageToken = searchListResponse.NextPageToken;
-                //}
+                }
             }
             catch (Exception ex)
             {
