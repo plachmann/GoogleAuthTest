@@ -6,17 +6,16 @@ using Newtonsoft.Json;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
-using Google.Apis.YouTube.v3.Data;
 using Google.Apis.YouTubeAnalytics.v2;
 using Google.Apis.YouTubeReporting.v1;
 using GoogleAuthTest.Models;
 using System.Linq;
-using Google.Apis.Auth.OAuth2.Requests;
 using Google.Apis.Auth.OAuth2.Responses;
 using System.Net;
 using Newtonsoft.Json.Linq;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Util.Store;
+using Microsoft.Extensions.Logging;
 
 namespace GoogleAuthTest
 {
@@ -79,33 +78,41 @@ namespace GoogleAuthTest
             }.FromPrivateKey(privateKey));
         }
 
-        public async Task<List<string>> SearchForVideosAsync2(string channelID)
+        public async Task<List<string>> SearchForVideosAsync2(string channelID, int channelStartYear, ILogger log)
         {
             List<string> videos = new List<string>();
             var nextPageToken = "";
 
             try
             {
-                while (nextPageToken != null)
+                // loop through years - channel start year to current. get videos published in each year
+                for (int year = channelStartYear; year <= DateTime.Now.Year; year++)
                 {
-                    var searchListRequest = youtubeService.Search.List("snippet");
-                    searchListRequest.MaxResults = 50;
-                    searchListRequest.ChannelId = channelID;
-                    searchListRequest.Type = "video";
-                    searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Date;
-                    if (nextPageToken != "")
+                    while (nextPageToken != null)
                     {
-                        searchListRequest.PageToken = nextPageToken;
-                    }
+                        var searchListRequest = youtubeService.Search.List("snippet");
+                        searchListRequest.MaxResults = 50;
+                        searchListRequest.ChannelId = channelID;
+                        searchListRequest.Type = "video";
+                        searchListRequest.Order = SearchResource.ListRequest.OrderEnum.Date;
+                        searchListRequest.PublishedAfter = $"{year}-01-01T00:00:00Z";
+                        searchListRequest.PublishedBefore = $"{year+1}-01-01T00:00:00Z";
+                        if (nextPageToken != "")
+                        {
+                            searchListRequest.PageToken = nextPageToken;
+                        }
 
-                    var searchListResponse = await searchListRequest.ExecuteAsync();
+                        var searchListResponse = await searchListRequest.ExecuteAsync();
 
-                    foreach (var searchlistItem in searchListResponse.Items)
-                    {
-                        videos.Add(searchlistItem.Id.VideoId);
+                        foreach (var searchlistItem in searchListResponse.Items)
+                        {
+                            videos.Add(searchlistItem.Id.VideoId);
+                        }
+
+                        nextPageToken = searchListResponse.NextPageToken;
                     }
-                    
-                    nextPageToken = searchListResponse.NextPageToken;
+                    log.LogInformation($"year: {year}   current total: {videos.Count}");
+                    nextPageToken = "";
                 }
             }
             catch (Exception ex)
@@ -127,7 +134,7 @@ namespace GoogleAuthTest
             {
                 DateTime estDateTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"));
 
-                var channelMetricsRequest = youtubeService.Channels.List("statistics");
+                var channelMetricsRequest = youtubeService.Channels.List("statistics,snippet");
                 channelMetricsRequest.Id = platformChannelID;
 
                 var channelMetricsResponse = await channelMetricsRequest.ExecuteAsync();
@@ -136,6 +143,7 @@ namespace GoogleAuthTest
                 youTubeChannelMetricsRecord.SubscriberCount = item.Statistics.SubscriberCount != null ? Convert.ToInt32(item.Statistics.SubscriberCount.ToString()) : 0;
                 youTubeChannelMetricsRecord.VideoCount = item.Statistics.VideoCount != null ? Convert.ToInt32(item.Statistics.VideoCount.ToString()) : 0;
                 youTubeChannelMetricsRecord.ViewCount = item.Statistics.ViewCount != null ? Convert.ToInt32(item.Statistics.ViewCount.ToString()) : 0;
+                youTubeChannelMetricsRecord.ChannelPublishDate = item.Snippet.PublishedAt != null ? Convert.ToDateTime(item.Snippet.PublishedAt) : new DateTime(2010, 1, 1);
                 youTubeChannelMetricsRecord.CreateDateTime = estDateTime;
                 youTubeChannelMetricsRecord.UpdateDateTime = estDateTime;
             }
@@ -229,8 +237,6 @@ namespace GoogleAuthTest
             {
                 throw ex;
             }
-
-
             return youTubeVideoMetricsRecord;
         }
 
@@ -360,7 +366,6 @@ namespace GoogleAuthTest
             }
             return rc;
         }
-
 
         private int ConvertToSeconds(string ptString)
         {
